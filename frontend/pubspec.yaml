@@ -17,6 +17,7 @@ dependencies:
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.0
   shimmer: ^3.0.0
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +27,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
