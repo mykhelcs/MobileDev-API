@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/tmdb_api_service.dart';
-import 'core/services/favorites_service.dart';
 import 'core/theme/app_theme.dart';
-import 'presentation/providers/home_provider.dart';
-import 'presentation/providers/search_provider.dart';
-import 'presentation/providers/favorites_provider.dart';
-import 'presentation/screens/main_shell.dart';
+import 'presentation/providers/movie_provider.dart';
+import 'presentation/screens/movie_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,10 +13,8 @@ void main() async {
   try {
     await dotenv.load(fileName: '.env');
   } catch (_) {
-    // Gracefully handle missing or inaccessible .env in testing/web environments
+    // Gracefully handle missing or inaccessible .env
   }
-
-  final prefs = await SharedPreferences.getInstance();
 
   final tmdbApiKey = dotenv.env['TMDB_API_KEY'] ??
       const String.fromEnvironment(
@@ -29,16 +23,12 @@ void main() async {
       );
 
   final tmdbService = TmdbApiService(apiKey: tmdbApiKey);
-  final favoritesService = FavoritesService(prefs);
 
   runApp(
     MultiProvider(
       providers: [
         Provider<TmdbApiService>.value(value: tmdbService),
-        Provider<FavoritesService>.value(value: favoritesService),
-        ChangeNotifierProvider(create: (_) => HomeProvider(tmdbService)),
-        ChangeNotifierProvider(create: (_) => SearchProvider(tmdbService)),
-        ChangeNotifierProvider(create: (_) => FavoritesProvider(favoritesService)),
+        ChangeNotifierProvider(create: (_) => MovieProvider(tmdbService)),
       ],
       child: const MovieHubApp(),
     ),
@@ -51,10 +41,10 @@ class MovieHubApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MovieHub',
+      title: 'MovieHub — TMDB API Viewer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const MainShell(),
+      home: const MovieListScreen(),
     );
   }
 }

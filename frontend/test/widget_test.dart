@@ -1,203 +1,267 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import 'package:provider/provider.dart';
 import 'package:api/core/models/movie.dart';
-import 'package:api/core/models/cast_member.dart';
-import 'package:api/core/models/watch_provider.dart';
-import 'package:api/core/services/favorites_service.dart';
-import 'package:api/presentation/widgets/genre_chip.dart';
-import 'package:api/presentation/widgets/movie_poster_card.dart';
-import 'package:api/presentation/widgets/now_playing_card.dart';
-import 'package:api/presentation/widgets/fav_item_tile.dart';
-import 'package:api/presentation/widgets/state_views.dart';
+import 'package:api/core/services/tmdb_api_service.dart';
+import 'package:api/presentation/providers/movie_provider.dart';
+import 'package:api/presentation/screens/movie_list_screen.dart';
+import 'package:api/presentation/screens/movie_detail_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final testMovie = Movie(
-    id: 101,
-    title: 'Interstellar Voyage',
-    overview: 'A deep space exploration adventure beyond known galaxies.',
-    posterPath: '/path_to_poster.jpg',
-    backdropPath: '/path_to_backdrop.jpg',
-    voteAverage: 8.8,
-    releaseDate: '2024-11-05',
-    genreIds: const [878, 12],
-    runtime: 169,
-    tagline: 'Mankind was born on Earth. It was never meant to die here.',
-    status: 'Released',
-  );
 
-  group('Movie Model & Formatting Tests', () {
-    test('Movie properly computes derived getters', () {
-      expect(testMovie.releaseYear, '2024');
-      expect(testMovie.ratingFormatted, '8.8');
-      expect(testMovie.runtimeFormatted, '2h 49m');
-      expect(testMovie.posterUrl, contains('/path_to_poster.jpg'));
-      expect(testMovie.backdropUrl, contains('/path_to_backdrop.jpg'));
+  final sampleDetailJson = {
+    'id': 550,
+    'title': 'Fight Club',
+    'overview': 'A ticking-time-bomb insomniac and a slippery soap salesman...',
+    'poster_path': '/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg',
+    'backdrop_path': '/hZkgoQYus5vegHoetLkCJzb17zJ.jpg',
+    'vote_average': 8.433,
+    'release_date': '1999-10-15',
+    'genre_ids': [18, 53],
+    'runtime': 139,
+    'tagline': 'Mischief. Mayhem. Soap.',
+    'status': 'Released',
+  };
+
+  group('Movie Model Tests', () {
+    test('Movie parses TMDB API response accurately', () {
+      final movie = Movie.fromJson(sampleDetailJson);
+      expect(movie.id, 550);
+      expect(movie.title, 'Fight Club');
+      expect(movie.ratingFormatted, '8.4');
+      expect(movie.releaseYear, '1999');
+      expect(movie.runtimeFormatted, '2h 19m');
+      expect(movie.posterUrl, contains('/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg'));
+      expect(movie.backdropUrl, contains('/hZkgoQYus5vegHoetLkCJzb17zJ.jpg'));
     });
 
     test('Movie serialization round-trip', () {
-      final json = testMovie.toJson();
+      final movie = Movie.fromJson(sampleDetailJson);
+      final json = movie.toJson();
       final fromJson = Movie.fromJson(json);
-      expect(fromJson.id, testMovie.id);
-      expect(fromJson.title, testMovie.title);
-      expect(fromJson.voteAverage, testMovie.voteAverage);
-      expect(fromJson == testMovie, isTrue);
+      expect(fromJson.id, movie.id);
+      expect(fromJson.title, movie.title);
+      expect(fromJson == movie, isTrue);
     });
+  });
 
-    test('CastMember serialization', () {
-      final cast = CastMember.fromJson({
-        'id': 1,
-        'name': 'Matthew McConaughey',
-        'character': 'Cooper',
-        'profile_path': '/cooper.jpg',
+  group('TmdbApiService with Dio Tests', () {
+    test('TmdbApiService fetches and parses movies using Dio', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/movie/popular')) {
+          return ResponseBody.fromString(
+            '''{
+              "page": 1,
+              "results": [
+                {
+                  "id": 550,
+                  "title": "Fight Club",
+                  "overview": "A ticking-time-bomb insomniac",
+                  "poster_path": "/poster.jpg",
+                  "backdrop_path": "/backdrop.jpg",
+                  "vote_average": 8.4,
+                  "release_date": "1999-10-15",
+                  "genre_ids": [18]
+                }
+              ]
+            }''',
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
       });
-      expect(cast.name, 'Matthew McConaughey');
-      expect(cast.character, 'Cooper');
-      expect(cast.profileUrl, contains('/cooper.jpg'));
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final movies = await service.fetchPopular();
+
+      expect(movies, isNotEmpty);
+      expect(movies.first.title, 'Fight Club');
+      expect(movies.first.id, 550);
     });
 
-    test('WatchProvider serialization', () {
-      final provider = WatchProvider.fromJson({
-        'provider_id': 8,
-        'provider_name': 'Netflix',
-        'logo_path': '/netflix.jpg',
+    test('TmdbApiService fetches movie detail with Dio', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/movie/550')) {
+          return ResponseBody.fromString(
+            '''{
+              "id": 550,
+              "title": "Fight Club",
+              "overview": "Detail overview",
+              "poster_path": "/poster.jpg",
+              "backdrop_path": "/backdrop.jpg",
+              "vote_average": 8.4,
+              "release_date": "1999-10-15",
+              "runtime": 139,
+              "tagline": "Soap."
+            }''',
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
       });
-      expect(provider.providerId, 8);
-      expect(provider.providerName, 'Netflix');
-      expect(provider.logoUrl, contains('/netflix.jpg'));
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final detail = await service.fetchMovieDetail(550);
+
+      expect(detail.id, 550);
+      expect(detail.tagline, 'Soap.');
+      expect(detail.runtime, 139);
     });
   });
 
-  group('FavoritesService Tests', () {
-    test('add, remove, and query favorites with SharedPreferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final prefs = await SharedPreferences.getInstance();
-      final favService = FavoritesService(prefs);
+  group('MovieProvider State Tests', () {
+    test('loadMovies populates movies list from API service', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        return ResponseBody.fromString(
+          '''{
+            "page": 1,
+            "results": [
+              {
+                "id": 100,
+                "title": "Inception",
+                "overview": "Dream within a dream",
+                "poster_path": "/inc.jpg",
+                "backdrop_path": "/inc_bg.jpg",
+                "vote_average": 8.8,
+                "release_date": "2010-07-16",
+                "genre_ids": [878]
+              }
+            ]
+          }''',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
 
-      expect(favService.getAll(), isEmpty);
-      expect(favService.isFavorite(testMovie.id), isFalse);
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
 
-      await favService.add(testMovie);
-      expect(favService.getAll().length, 1);
-      expect(favService.isFavorite(testMovie.id), isTrue);
+      expect(provider.isLoading, isFalse);
+      expect(provider.movies, isEmpty);
 
-      await favService.toggle(testMovie);
-      expect(favService.getAll(), isEmpty);
-      expect(favService.isFavorite(testMovie.id), isFalse);
+      final future = provider.loadMovies();
+      expect(provider.isLoading, isTrue);
+
+      await future;
+      expect(provider.isLoading, isFalse);
+      expect(provider.movies.length, 1);
+      expect(provider.movies.first.title, 'Inception');
+    });
+
+    test('loadMovies handles error gracefully', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        throw DioException(
+          requestOptions: options,
+          error: 'Connection refused',
+        );
+      });
+
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
+
+      await provider.loadMovies();
+      expect(provider.isLoading, isFalse);
+      expect(provider.movies, isEmpty);
+      expect(provider.errorMessage, isNotNull);
     });
   });
 
-  group('Widget Rendering Tests', () {
-    testWidgets('GenreChip displays label and responds to tap', (tester) async {
-      bool tapped = false;
+  group('UI Presentation & API Output Display Tests', () {
+    testWidgets('MovieListScreen displays movie API outputs', (tester) async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        return ResponseBody.fromString(
+          '''{
+            "page": 1,
+            "results": [
+              {
+                "id": 100,
+                "title": "Inception",
+                "overview": "A thief who steals corporate secrets through dream-sharing technology.",
+                "poster_path": "/inc.jpg",
+                "backdrop_path": "/inc_bg.jpg",
+                "vote_average": 8.8,
+                "release_date": "2010-07-16",
+                "genre_ids": [878]
+              }
+            ]
+          }''',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
+
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GenreChip(
-              label: 'Sci-Fi',
-              isActive: true,
-              onTap: () => tapped = true,
-            ),
+        ChangeNotifierProvider.value(
+          value: provider,
+          child: const MaterialApp(
+            home: MovieListScreen(),
           ),
         ),
       );
 
-      expect(find.text('Sci-Fi'), findsOneWidget);
-      await tester.tap(find.byType(GenreChip));
-      expect(tapped, isTrue);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Inception'), findsOneWidget);
+      expect(find.textContaining('8.8'), findsOneWidget);
+      expect(find.textContaining('2010'), findsOneWidget);
     });
 
-    testWidgets('MoviePosterCard displays title, rank and rating', (tester) async {
+    testWidgets('MovieDetailScreen displays full API details', (tester) async {
+      final movie = Movie.fromJson(sampleDetailJson);
+
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: MoviePosterCard(
-              movie: testMovie,
-              rank: 1,
-              onTap: () {},
-            ),
-          ),
+          home: MovieDetailScreen(movie: movie),
         ),
       );
 
-      expect(find.text('Interstellar Voyage'), findsOneWidget);
-      expect(find.text('#1'), findsOneWidget);
-      expect(find.text('8.8'), findsOneWidget);
-      expect(find.text('2024'), findsOneWidget);
-    });
-
-    testWidgets('NowPlayingCard displays title and rating', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: NowPlayingCard(
-              movie: testMovie,
-              onTap: () {},
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Interstellar Voyage'), findsOneWidget);
-      expect(find.text('8.8'), findsOneWidget);
-    });
-
-    testWidgets('FavItemTile renders movie info and delete callback', (tester) async {
-      bool deleted = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: FavItemTile(
-              movie: testMovie,
-              onTap: () {},
-              onDelete: () => deleted = true,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Interstellar Voyage'), findsOneWidget);
-      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.delete_outline));
-      expect(deleted, isTrue);
-    });
-
-    testWidgets('EmptyView renders title and subtitle', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: EmptyView(
-              icon: Icons.bookmark_border_rounded,
-              title: 'No saved movies',
-              subtitle: 'Start exploring and bookmarking films.',
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('No saved movies'), findsOneWidget);
-      expect(find.text('Start exploring and bookmarking films.'), findsOneWidget);
-    });
-
-    testWidgets('ErrorView renders error message and retry button', (tester) async {
-      bool retried = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: ErrorView(
-              message: 'Failed to connect to TMDB',
-              onRetry: () => retried = true,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Failed to connect to TMDB'), findsOneWidget);
-      expect(find.text('Try Again'), findsOneWidget);
-      await tester.tap(find.text('Try Again'));
-      expect(retried, isTrue);
+      expect(find.text('Fight Club'), findsWidgets);
+      expect(find.text('Mischief. Mayhem. Soap.'), findsOneWidget);
+      expect(find.textContaining('2h 19m'), findsOneWidget);
+      expect(find.text('8.4 / 10'), findsOneWidget);
+      expect(find.textContaining('1999'), findsWidgets);
+      expect(find.text(movie.overview), findsOneWidget);
+      expect(find.text('TMDB API Output Data'), findsOneWidget);
     });
   });
+}
+
+class _MockHttpClientAdapter implements HttpClientAdapter {
+  final ResponseBody Function(RequestOptions options) handler;
+
+  _MockHttpClientAdapter(this.handler);
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return handler(options);
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
