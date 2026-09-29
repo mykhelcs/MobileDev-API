@@ -41,7 +41,7 @@ class MovieHubApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MovieHub — TMDB API Viewer',
+      title: 'MovieHub - Your Movie Companion',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       home: const MovieListScreen(),
