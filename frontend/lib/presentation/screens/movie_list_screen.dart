@@ -32,7 +32,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          'MovieHub — TMDB API Output',
+          'MovieHub — Your Movie Companion',
           style: AppTypography.cardTitle.copyWith(fontSize: 18),
         ),
         backgroundColor: AppColors.surface1,
