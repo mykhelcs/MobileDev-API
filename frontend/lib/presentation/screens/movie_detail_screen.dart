@@ -3,13 +3,23 @@ import '../../core/models/movie.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 
-/// Screen displaying the complete movie details retrieved from the TMDB API.
+/// ============================================================================
+/// SCREEN: MovieDetailScreen
+/// ============================================================================
+/// Displays detailed information about a selected movie.
+///
+/// Key educational concepts demonstrated:
+/// 1. Constructor parameter passing: Receives the selected [Movie] instance directly.
+/// 2. Responsive image presentation: Uses [AspectRatio] (16:9) to keep image proportions consistent.
+/// 3. Flow layout: Uses [Wrap] to display metadata chips without horizontal overflow errors.
+/// 4. API Output Inspector: A dedicated card showing exact fields parsed from TMDB API JSON.
 class MovieDetailScreen extends StatelessWidget {
   const MovieDetailScreen({
     super.key,
     required this.movie,
   });
 
+  /// The movie instance whose details are presented
   final Movie movie;
 
   @override
@@ -32,7 +42,7 @@ class MovieDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Backdrop / Poster Image
+            // Section 1: 16:9 Backdrop Banner Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: AspectRatio(
@@ -51,7 +61,7 @@ class MovieDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Title & Tagline
+            // Section 2: Movie Title & Catchphrase / Tagline
             Text(
               movie.title,
               style: AppTypography.detailTitle,
@@ -65,7 +75,7 @@ class MovieDetailScreen extends StatelessWidget {
             ],
             const SizedBox(height: 16),
 
-            // Metadata Chips (Rating, Release Date, Runtime, Status)
+            // Section 3: Metadata Badges (Rating, Release Date, Runtime, Status)
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -93,7 +103,7 @@ class MovieDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Overview Section
+            // Section 4: Plot Overview
             Text(
               'Overview',
               style: AppTypography.sectionHeadline,
@@ -105,7 +115,9 @@ class MovieDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // API Output Inspector Card (demonstrates raw parsed API fields)
+            // Section 5: API Output Inspector Card
+            // This component visually confirms the API parsing contract by listing
+            // the raw mapped properties directly on screen.
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -145,6 +157,7 @@ class MovieDetailScreen extends StatelessWidget {
     );
   }
 
+  // ── Helper: Pill Badge Chip ───────────────────────────────────────────────
   Widget _buildInfoChip({
     required IconData icon,
     required String label,
@@ -174,6 +187,7 @@ class MovieDetailScreen extends StatelessWidget {
     );
   }
 
+  // ── Helper: API Key-Value Data Row ────────────────────────────────────────
   Widget _buildApiFieldRow(String key, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),

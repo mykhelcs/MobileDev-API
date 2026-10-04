@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/models/movie.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../providers/movie_provider.dart';
 import 'movie_detail_screen.dart';
 
-/// Main screen displaying the list of movies fetched from the TMDB API using Dio.
+/// ============================================================================
+/// SCREEN: MovieListScreen
+/// ============================================================================
+/// The primary landing screen of the app. It displays movies retrieved from the
+/// TMDB API and allows the user to:
+/// 1. Browse movies in a scrollable list.
+/// 2. Tap any movie card to navigate to its detail view.
+/// 3. Pull-down to refresh the list or tap the reload icon in the AppBar.
+/// 4. View clear feedback during loading, error, or empty states.
 class MovieListScreen extends StatefulWidget {
   const MovieListScreen({super.key});
 
@@ -18,6 +27,10 @@ class _MovieListScreenState extends State<MovieListScreen> {
   @override
   void initState() {
     super.initState();
+
+    // In Flutter, widget initialization happens before the first frame is painted.
+    // We schedule data fetching using addPostFrameCallback so that provider
+    // notifications do not conflict with the initial build phase.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<MovieProvider>();
       if (provider.movies.isEmpty && !provider.isLoading) {
@@ -38,6 +51,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
         backgroundColor: AppColors.surface1,
         elevation: 0,
         actions: [
+          // Quick reload button in the top app bar
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.textPrimary),
             tooltip: 'Reload from API',
@@ -45,8 +59,10 @@ class _MovieListScreenState extends State<MovieListScreen> {
           ),
         ],
       ),
+      // Consumer listens for changes from MovieProvider and rebuilds only this subtree
       body: Consumer<MovieProvider>(
         builder: (context, provider, _) {
+          // State 1: Initial Loading Indicator
           if (provider.isLoading && provider.movies.isEmpty) {
             return Center(
               child: Column(
@@ -63,6 +79,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
             );
           }
 
+          // State 2: Error Feedback Screen with retry button
           if (provider.errorMessage != null && provider.movies.isEmpty) {
             return Center(
               child: Padding(
@@ -98,6 +115,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
             );
           }
 
+          // State 3: Empty State (API returned 0 items)
           if (provider.movies.isEmpty) {
             return Center(
               child: Text(
@@ -107,6 +125,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
             );
           }
 
+          // State 4: Populated List with Pull-to-Refresh support
           return RefreshIndicator(
             color: AppColors.accent,
             backgroundColor: AppColors.surface1,
@@ -120,6 +139,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
                 return _MovieCard(
                   movie: movie,
                   onTap: () {
+                    // Update provider selection and navigate to detail page
                     provider.selectMovie(movie);
                     Navigator.push(
                       context,
@@ -138,6 +158,14 @@ class _MovieListScreenState extends State<MovieListScreen> {
   }
 }
 
+/// ============================================================================
+/// COMPONENT WIDGET: _MovieCard
+/// ============================================================================
+/// Reusable card displaying an individual movie item:
+/// - Poster image thumbnail
+/// - Title with 2-line overflow cutoff
+/// - Star rating and calendar year badge
+/// - Brief synopsis overview
 class _MovieCard extends StatelessWidget {
   const _MovieCard({
     required this.movie,
@@ -162,7 +190,7 @@ class _MovieCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Poster thumbnail
+            // Poster thumbnail with network error fallback
             SizedBox(
               width: 100,
               height: 150,
@@ -177,7 +205,7 @@ class _MovieCard extends StatelessWidget {
                 ),
               ),
             ),
-            // Movie info
+            // Movie info metadata
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
