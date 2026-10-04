@@ -101,7 +101,6 @@ navigations/
 ## Demo App with Video
 
 ### Video Demonstration
-`2026-09-29.19-49-11.mp4`
 
 ---
 
