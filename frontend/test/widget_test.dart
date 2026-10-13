@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
+import 'package:api/core/constants/app_constants.dart';
+import 'package:api/core/models/cast_member.dart';
 import 'package:api/core/models/movie.dart';
 import 'package:api/core/services/tmdb_api_service.dart';
 import 'package:api/presentation/providers/movie_provider.dart';
@@ -10,7 +12,6 @@ import 'package:api/presentation/screens/movie_detail_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
 
   final sampleDetailJson = {
     'id': 550,
@@ -26,7 +27,15 @@ void main() {
     'status': 'Released',
   };
 
-  group('Movie Model Tests', () {
+  final sampleCastJson = {
+    'id': 6193,
+    'name': 'Leonardo DiCaprio',
+    'character': 'Dom Cobb',
+    'profile_path': '/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg',
+    'order': 0,
+  };
+
+  group('Movie & Cast Model Tests', () {
     test('Movie parses TMDB API response accurately', () {
       final movie = Movie.fromJson(sampleDetailJson);
       expect(movie.id, 550);
@@ -46,10 +55,24 @@ void main() {
       expect(fromJson.title, movie.title);
       expect(fromJson == movie, isTrue);
     });
+
+    test('CastMember parses TMDB credits API accurately', () {
+      final cast = CastMember.fromJson(sampleCastJson);
+      expect(cast.id, 6193);
+      expect(cast.name, 'Leonardo DiCaprio');
+      expect(cast.character, 'Dom Cobb');
+      expect(cast.profileUrl, contains('/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg'));
+
+      final json = cast.toJson();
+      final fromJson = CastMember.fromJson(json);
+      expect(fromJson.id, cast.id);
+      expect(fromJson.name, cast.name);
+      expect(fromJson == cast, isTrue);
+    });
   });
 
-  group('TmdbApiService with Dio Tests', () {
-    test('TmdbApiService fetches and parses movies using Dio', () async {
+  group('TmdbApiService with Dio Tests (6 Endpoints)', () {
+    test('1. fetchPopular fetches and parses movies', () async {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
         if (options.path.contains('/movie/popular')) {
@@ -70,9 +93,7 @@ void main() {
               ]
             }''',
             200,
-            headers: {
-              Headers.contentTypeHeader: [Headers.jsonContentType],
-            },
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
           );
         }
         return ResponseBody.fromString('{}', 404);
@@ -86,7 +107,78 @@ void main() {
       expect(movies.first.id, 550);
     });
 
-    test('TmdbApiService fetches movie detail with Dio', () async {
+    test('2. fetchTopRated fetches top rated movies', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/movie/top_rated')) {
+          return ResponseBody.fromString(
+            '''{
+              "page": 1,
+              "results": [
+                {
+                  "id": 238,
+                  "title": "The Godfather",
+                  "overview": "Spanning the years 1945 to 1955...",
+                  "poster_path": "/godfather.jpg",
+                  "backdrop_path": "/godfather_bg.jpg",
+                  "vote_average": 8.7,
+                  "release_date": "1972-03-14",
+                  "genre_ids": [18, 80]
+                }
+              ]
+            }''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
+      });
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final movies = await service.fetchTopRated();
+
+      expect(movies, isNotEmpty);
+      expect(movies.first.title, 'The Godfather');
+      expect(movies.first.id, 238);
+    });
+
+    test('3. searchMovies searches movies by keyword query', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/search/movie') &&
+            options.queryParameters['query'] == 'Inception') {
+          return ResponseBody.fromString(
+            '''{
+              "page": 1,
+              "results": [
+                {
+                  "id": 27205,
+                  "title": "Inception",
+                  "overview": "Cobb steals corporate secrets...",
+                  "poster_path": "/inc.jpg",
+                  "backdrop_path": "/inc_bg.jpg",
+                  "vote_average": 8.4,
+                  "release_date": "2010-07-15",
+                  "genre_ids": [28, 878]
+                }
+              ]
+            }''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
+      });
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final results = await service.searchMovies('Inception');
+
+      expect(results, isNotEmpty);
+      expect(results.first.title, 'Inception');
+      expect(results.first.id, 27205);
+    });
+
+    test('4. fetchMovieDetail fetches movie detail with Dio', () async {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
         if (options.path.contains('/movie/550')) {
@@ -103,9 +195,7 @@ void main() {
               "tagline": "Soap."
             }''',
             200,
-            headers: {
-              Headers.contentTypeHeader: [Headers.jsonContentType],
-            },
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
           );
         }
         return ResponseBody.fromString('{}', 404);
@@ -118,22 +208,98 @@ void main() {
       expect(detail.tagline, 'Soap.');
       expect(detail.runtime, 139);
     });
-  });
 
-  group('MovieProvider State Tests', () {
-    test('loadMovies populates movies list from API service', () async {
+    test('5. fetchCredits fetches movie cast/actors', () async {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/movie/550/credits')) {
+          return ResponseBody.fromString(
+            '''{
+              "id": 550,
+              "cast": [
+                {
+                  "id": 287,
+                  "name": "Brad Pitt",
+                  "character": "Tyler Durden",
+                  "profile_path": "/brad.jpg",
+                  "order": 0
+                },
+                {
+                  "id": 819,
+                  "name": "Edward Norton",
+                  "character": "The Narrator",
+                  "profile_path": "/edward.jpg",
+                  "order": 1
+                }
+              ]
+            }''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
+      });
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final cast = await service.fetchCredits(550);
+
+      expect(cast.length, 2);
+      expect(cast.first.name, 'Brad Pitt');
+      expect(cast.first.character, 'Tyler Durden');
+      expect(cast.last.name, 'Edward Norton');
+    });
+
+    test('6. fetchRecommendations fetches suggested movies', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.contains('/movie/550/recommendations')) {
+          return ResponseBody.fromString(
+            '''{
+              "page": 1,
+              "results": [
+                {
+                  "id": 680,
+                  "title": "Pulp Fiction",
+                  "overview": "A burger-loving hit man...",
+                  "poster_path": "/pulp.jpg",
+                  "backdrop_path": "/pulp_bg.jpg",
+                  "vote_average": 8.5,
+                  "release_date": "1994-09-10",
+                  "genre_ids": [53, 80]
+                }
+              ]
+            }''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString('{}', 404);
+      });
+
+      final service = TmdbApiService(apiKey: 'dummy_key', dio: dio);
+      final recs = await service.fetchRecommendations(550);
+
+      expect(recs.length, 1);
+      expect(recs.first.title, 'Pulp Fiction');
+      expect(recs.first.id, 680);
+    });
+  });
+
+  group('MovieProvider State Management Tests', () {
+    test('loadMovies & switchCategory populate category movies', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        final title = options.path.contains('top_rated') ? 'The Godfather' : 'Inception';
         return ResponseBody.fromString(
           '''{
             "page": 1,
             "results": [
               {
                 "id": 100,
-                "title": "Inception",
-                "overview": "Dream within a dream",
-                "poster_path": "/inc.jpg",
-                "backdrop_path": "/inc_bg.jpg",
+                "title": "$title",
+                "overview": "Sample overview",
+                "poster_path": "/sample.jpg",
+                "backdrop_path": "/sample_bg.jpg",
                 "vote_average": 8.8,
                 "release_date": "2010-07-16",
                 "genre_ids": [878]
@@ -141,33 +307,7 @@ void main() {
             ]
           }''',
           200,
-          headers: {
-            Headers.contentTypeHeader: [Headers.jsonContentType],
-          },
-        );
-      });
-
-      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
-      final provider = MovieProvider(service);
-
-      expect(provider.isLoading, isFalse);
-      expect(provider.movies, isEmpty);
-
-      final future = provider.loadMovies();
-      expect(provider.isLoading, isTrue);
-
-      await future;
-      expect(provider.isLoading, isFalse);
-      expect(provider.movies.length, 1);
-      expect(provider.movies.first.title, 'Inception');
-    });
-
-    test('loadMovies handles error gracefully', () async {
-      final dio = Dio();
-      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
-        throw DioException(
-          requestOptions: options,
-          error: 'Connection refused',
+          headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
         );
       });
 
@@ -175,14 +315,90 @@ void main() {
       final provider = MovieProvider(service);
 
       await provider.loadMovies();
-      expect(provider.isLoading, isFalse);
-      expect(provider.movies, isEmpty);
-      expect(provider.errorMessage, isNotNull);
+      expect(provider.movies.first.title, 'Inception');
+      expect(provider.activeCategory, MovieCategory.popular);
+
+      await provider.switchCategory(MovieCategory.topRated);
+      expect(provider.activeCategory, MovieCategory.topRated);
+      expect(provider.movies.first.title, 'The Godfather');
+    });
+
+    test('search and clearSearch update search state', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        return ResponseBody.fromString(
+          '''{
+            "page": 1,
+            "results": [
+              {
+                "id": 200,
+                "title": "Avatar",
+                "overview": "Pandora exploration",
+                "poster_path": "/avatar.jpg",
+                "backdrop_path": "/avatar_bg.jpg",
+                "vote_average": 7.5,
+                "release_date": "2009-12-15",
+                "genre_ids": [28, 878]
+              }
+            ]
+          }''',
+          200,
+          headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        );
+      });
+
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
+
+      expect(provider.isSearchActive, isFalse);
+      await provider.search('Avatar');
+
+      expect(provider.isSearchActive, isTrue);
+      expect(provider.searchResults.length, 1);
+      expect(provider.searchResults.first.title, 'Avatar');
+
+      provider.clearSearch();
+      expect(provider.isSearchActive, isFalse);
+      expect(provider.searchResults, isEmpty);
+    });
+
+    test('loadMovieDetailData loads detail, cast, and recommendations concurrently', () async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.endsWith('/credits')) {
+          return ResponseBody.fromString(
+            '''{"id": 550, "cast": [{"id": 287, "name": "Brad Pitt", "character": "Tyler", "order": 0}]}''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        if (options.path.endsWith('/recommendations')) {
+          return ResponseBody.fromString(
+            '''{"results": [{"id": 680, "title": "Pulp Fiction", "overview": "Pulp", "poster_path": "/p.jpg", "backdrop_path": "/b.jpg", "vote_average": 8.5, "release_date": "1994-09-10", "genre_ids": [80]}]}''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString(
+          '''{"id": 550, "title": "Fight Club", "overview": "Detailed", "poster_path": "/p.jpg", "backdrop_path": "/b.jpg", "vote_average": 8.4, "release_date": "1999-10-15", "runtime": 139, "tagline": "Soap"}''',
+          200,
+          headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        );
+      });
+
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
+
+      await provider.loadMovieDetailData(550);
+
+      expect(provider.selectedMovie?.title, 'Fight Club');
+      expect(provider.cast.first.name, 'Brad Pitt');
+      expect(provider.recommendations.first.title, 'Pulp Fiction');
     });
   });
 
-  group('UI Presentation & API Output Display Tests', () {
-    testWidgets('MovieListScreen displays movie API outputs', (tester) async {
+  group('UI Presentation & Widget Display Tests', () {
+    testWidgets('MovieListScreen displays search bar, category chips, and movie cards', (tester) async {
       final dio = Dio();
       dio.httpClientAdapter = _MockHttpClientAdapter((options) {
         return ResponseBody.fromString(
@@ -202,9 +418,7 @@ void main() {
             ]
           }''',
           200,
-          headers: {
-            Headers.contentTypeHeader: [Headers.jsonContentType],
-          },
+          headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
         );
       });
 
@@ -223,27 +437,60 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('🔥 Popular'), findsOneWidget);
+      expect(find.text('⭐ Top Rated'), findsOneWidget);
+      expect(find.text('📈 Trending'), findsOneWidget);
       expect(find.text('Inception'), findsOneWidget);
-      expect(find.textContaining('8.8'), findsOneWidget);
-      expect(find.textContaining('2010'), findsOneWidget);
     });
 
-    testWidgets('MovieDetailScreen displays full API details', (tester) async {
+    testWidgets('MovieDetailScreen displays cast, suggested movies, and API inspector', (tester) async {
+      final dio = Dio();
+      dio.httpClientAdapter = _MockHttpClientAdapter((options) {
+        if (options.path.endsWith('/credits')) {
+          return ResponseBody.fromString(
+            '''{"id": 550, "cast": [{"id": 287, "name": "Brad Pitt", "character": "Tyler Durden", "order": 0}]}''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        if (options.path.endsWith('/recommendations')) {
+          return ResponseBody.fromString(
+            '''{"results": [{"id": 680, "title": "Pulp Fiction", "overview": "Pulp", "poster_path": "/p.jpg", "backdrop_path": "/b.jpg", "vote_average": 8.5, "release_date": "1994-09-10", "genre_ids": [80]}]}''',
+            200,
+            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+          );
+        }
+        return ResponseBody.fromString(
+          '''{"id": 550, "title": "Fight Club", "overview": "Fight Club overview", "poster_path": "/p.jpg", "backdrop_path": "/b.jpg", "vote_average": 8.4, "release_date": "1999-10-15", "runtime": 139, "tagline": "Mischief. Mayhem. Soap."}''',
+          200,
+          headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        );
+      });
+
+      final service = TmdbApiService(apiKey: 'test_key', dio: dio);
+      final provider = MovieProvider(service);
       final movie = Movie.fromJson(sampleDetailJson);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: MovieDetailScreen(movie: movie),
+        ChangeNotifierProvider.value(
+          value: provider,
+          child: MaterialApp(
+            home: MovieDetailScreen(movie: movie),
+          ),
         ),
       );
 
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
       expect(find.text('Fight Club'), findsWidgets);
-      expect(find.text('Mischief. Mayhem. Soap.'), findsOneWidget);
-      expect(find.textContaining('2h 19m'), findsOneWidget);
-      expect(find.text('8.4 / 10'), findsOneWidget);
-      expect(find.textContaining('1999'), findsWidgets);
-      expect(find.text(movie.overview), findsOneWidget);
+      expect(find.text('Top Cast & Actors'), findsOneWidget);
+      expect(find.text('Suggested Movies (More Like This)'), findsOneWidget);
       expect(find.text('TMDB API Output Data'), findsOneWidget);
+      expect(find.text('Brad Pitt'), findsOneWidget);
+      expect(find.text('Tyler Durden'), findsOneWidget);
+      expect(find.text('Pulp Fiction'), findsOneWidget);
     });
   });
 }

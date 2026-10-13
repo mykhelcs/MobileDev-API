@@ -27,3 +27,14 @@ abstract final class AppConstants {
   // Shared Prefs key
   static const String favoritesKey = 'moviehub_favorites';
 }
+
+/// Movie category feeds available in the application
+enum MovieCategory {
+  popular('Popular', '🔥 Popular'),
+  topRated('Top Rated', '⭐ Top Rated'),
+  trending('Trending', '📈 Trending');
+
+  const MovieCategory(this.label, this.chipLabel);
+  final String label;
+  final String chipLabel;
+}
