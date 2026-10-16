@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MovieHub — Midterm Defense & API Architecture Presentation</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --bg-card: #121722;
+      --bg-surface: #19202f;
+      --bg-glass: rgba(18, 23, 34, 0.82);
+      --accent: #8b5cf6;
+      --accent-glow: rgba(139, 92, 246, 0.35);
+      --amber: #f59e0b;
+      --emerald: #10b981;
+      --rose: #f43f5e;
+      --cyan: #06b6d4;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(139, 92, 246, 0.4);
+      --code-bg: #07090e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+
+    /* Ambient background lighting */
+    .ambient-glow {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-glow) 0%, rgba(10, 13, 20, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(80px);
+      animation: pulseGlow 12s infinite alternate ease-in-out;
+    }
+    .ambient-glow.top-right {
+      top: -200px;
+      right: -100px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.25) 0%, rgba(10, 13, 20, 0) 70%);
+    }
+    .ambient-glow.bottom-left {
+      bottom: -200px;
+      left: -100px;
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(1) translate(0, 0); opacity: 0.6; }
+      100% { transform: scale(1.15) translate(30px, -20px); opacity: 0.9; }
+    }
+
+    /* App Container */
+    .deck-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      z-index: 1;
+    }
+
+    /* Top Header Bar */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: rgba(10, 13, 20, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #8b5cf6, #d946ef);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-toggle-notes {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-toggle-notes:hover, .btn-toggle-notes.active {
+      color: var(--text-main);
+      border-color: var(--accent);
+      background: rgba(139, 92, 246, 0.15);
+    }
+
+    .slide-counter {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      background: var(--bg-card);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 10%;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+      transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    /* Main Stage */
+    .presentation-stage {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slides-wrapper {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 36px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(40px) scale(0.98);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0) scale(1);
+    }
+
+    .slide.prev {
+      transform: translateX(-40px) scale(0.98);
+    }
+
+    /* Speaker Notes Drawer */
+    .notes-drawer {
+      width: 360px;
+      background: rgba(18, 23, 34, 0.95);
+      backdrop-filter: blur(20px);
+      border-left: 1px solid var(--border-accent);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 20;
+    }
+
+    .notes-drawer.open {
+      transform: translateX(0);
+    }
+
+    .notes-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .notes-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--amber);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .notes-content {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+      line-height: 1.6;
+      font-size: 0.92rem;
+      color: #cbd5e1;
+    }
+
+    .notes-content h4 {
+      color: var(--text-main);
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .notes-content .script-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-left: 3px solid var(--amber);
+      padding: 12px 14px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0 18px 0;
+      font-style: italic;
+      color: #fef08a;
+    }
+
+    .notes-content .cue-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .notes-content .cue-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    /* Slide Typography & Layouts */
+    .slide-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
+      width: fit-content;
+    }
+    .badge-purple { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); }
+    .badge-amber  { background: rgba(245, 158, 11, 0.2); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-cyan   { background: rgba(6, 182, 212, 0.2);  color: #a5f3fc; border: 1px solid rgba(6, 182, 212, 0.4); }
+    .badge-green  { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    .slide-title {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      max-width: 800px;
+    }
+
+    /* Grid layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .card.highlight {
+      border-color: var(--border-accent);
+      background: linear-gradient(165deg, rgba(139, 92, 246, 0.08) 0%, var(--bg-card) 100%);
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .icon-purple { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    .icon-cyan   { background: rgba(6, 182, 212, 0.2);  color: #38bdf8; }
+    .icon-amber  { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .icon-emerald{ background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .icon-rose   { background: rgba(244, 63, 94, 0.2);  color: #fb7185; }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .card-badge {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--cyan);
+      margin-top: 14px;
+      display: block;
+    }
+
+    /* Code Block Display */
+    .code-window {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .code-topbar {
+      background: #0f131c;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .code-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #eab308; }
+    .dot-green { background: #22c55e; }
+
+    .code-filename {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .code-content {
+      padding: 18px;
+      overflow-x: auto;
+      line-height: 1.6;
+      color: #e2e8f0;
+      flex: 1;
+    }
+
+    .kw { color: #c084fc; font-weight: 600; }
+    .fn { color: #60a5fa; }
+    .str { color: #34d399; }
+    .cm { color: #64748b; font-style: italic; }
+    .prop { color: #f472b6; }
+    .typ { color: #38bdf8; }
+    .num { color: #fbbf24; }
+
+    /* Interactive Pipeline Flowchart */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 20px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .pipeline-step {
+      flex: 1;
+      padding: 18px 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-align: center;
+      position: relative;
+    }
+
+    .pipeline-step.active-step {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .pipeline-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px auto;
+    }
+
+    .pipeline-arrow {
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+    }
+
+    /* Table styles */
+    .table-container {
+      background: var(--bg-card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag-path {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.1);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(6, 182, 212, 0.2);
+    }
+
+    /* Bottom Control Bar */
+    footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: rgba(10, 13, 20, 0.7);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      z-index: 10;
+    }
+
+    .nav-hints {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .kbd {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+    }
+
+    .nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-btn {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(139, 92, 246, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Title Slide Specifics */
+    .title-slide {
+      text-align: center;
+      align-items: center;
+    }
+
+    .title-hero {
+      font-size: 3.8rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 20%, #a78bfa 60%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .team-badge-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 24px;
+      max-width: 700px;
+    }
+
+    .member-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .member-chip.owner {
+      border-color: var(--accent);
+      background: rgba(139, 92, 246, 0.15);
+      color: #c4b5fd;
+    }
+
+    /* Live Test Inspector Widget on Slide 8 */
+    .inspector-card {
+      background: #090d16;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 14px;
+      padding: 18px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+    }
+    .inspector-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .inspector-row:last-child { border-bottom: none; }
+    .inspector-key { color: var(--text-muted); }
+    .inspector-val { color: var(--emerald); }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow top-right"></div>
+  <div class="ambient-glow bottom-left"></div>
+
+  <div class="deck-container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <i data-lucide="clapperboard" style="color: #a78bfa;"></i>
+        <span>MovieHub</span>
+        <span class="brand-badge">Midterm Defense</span>
+      </div>
+
+      <div class="top-controls">
+        <button class="btn-toggle-notes" id="toggleNotesBtn" title="Toggle Presenter Speech Script">
+          <i data-lucide="message-square-text" style="width: 16px; height: 16px;"></i>
+          <span>Reporter Script</span>
+        </button>
+        <button class="btn-toggle-notes" id="fullscreenBtn" title="Toggle Fullscreen">
+          <i data-lucide="maximize" style="width: 16px; height: 16px;"></i>
+        </button>
+        <div class="slide-counter" id="slideCounter">01 / 10</div>
+      </div>
+    </header>
+
+    <!-- Progress Track -->
+    <div class="progress-track">
+      <div class="progress-fill" id="progressBar"></div>
+    </div>
+
+    <!-- Presentation Stage -->
+    <div class="presentation-stage">
+      <div class="slides-wrapper">
+
+        <!-- SLIDE 1: TITLE SLIDE -->
+        <div class="slide active title-slide" data-slide="1">
+          <div class="slide-badge badge-purple">
+            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+            Mobile Programming Midterm Project
+          </div>
+          <h1 class="title-hero">MovieHub Architecture</h1>
+          <p class="slide-subtitle" style="text-align: center;">
+            A Production-Grade Flutter Application Consuming 6 Distinct TMDB REST API Endpoints with Dio, Data Models & Provider State Management.
+          </p>
+
+          <div style="margin-top: 10px; font-size: 0.95rem; color: var(--cyan); font-weight: 500;">
+            Project Defense & Technical Walkthrough
+          </div>
+
+          <div class="team-badge-group">
+            <div class="member-chip owner">
+              <i data-lucide="crown" style="width: 15px; height: 15px; color: var(--amber);"></i>
+              Glenn Mykhel V. Gulfan (Lead)
+            </div>
+            <div class="member-chip">
+              <i data-lucide="user" style="width: 15px; height: 15px;"></i>
+              Ranela Esgana
+            </div>
+            <div class="member-chip">
+              <i data-lucide="user" style="width: 15px; height: 15px;"></i>
+              Jayshan Godornes
+            </div>
+            <div class="member-chip">
+              <i data-lucide="user" style="width: 15px; height: 15px;"></i>
+              Sean Cole Calixton
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 2: ARCHITECTURE PIPELINE -->
+        <div class="slide" data-slide="2">
+          <div class="slide-badge badge-cyan">
+            <i data-lucide="layers" style="width: 14px; height: 14px;"></i>
+            High-Level Architecture
+          </div>
+          <h2 class="slide-title">How Data Flows in MovieHub</h2>
+          <p class="slide-subtitle">
+            Our codebase enforces a strict unidirectional 4-tier separation of concerns:
+          </p>
+
+          <div class="pipeline">
+            <div class="pipeline-step">
+              <div class="pipeline-num">1</div>
+              <strong style="color: var(--amber); display: block; margin-bottom: 4px;">TMDB REST API</strong>
+              <small style="color: var(--text-muted);">6 Cloud Endpoints</small>
+            </div>
+            <div class="pipeline-arrow"><i data-lucide="arrow-right"></i></div>
+
+            <div class="pipeline-step">
+              <div class="pipeline-num">2</div>
+              <strong style="color: var(--cyan); display: block; margin-bottom: 4px;">Dio Client Service</strong>
+              <small style="color: var(--text-muted);">tmdb_api_service.dart</small>
+            </div>
+            <div class="pipeline-arrow"><i data-lucide="arrow-right"></i></div>
+
+            <div class="pipeline-step">
+              <div class="pipeline-num">3</div>
+              <strong style="color: var(--emerald); display: block; margin-bottom: 4px;">Dart Models</strong>
+              <small style="color: var(--text-muted);">Movie.fromJson()</small>
+            </div>
+            <div class="pipeline-arrow"><i data-lucide="arrow-right"></i></div>
+
+            <div class="pipeline-step">
+              <div class="pipeline-num">4</div>
+              <strong style="color: var(--accent); display: block; margin-bottom: 4px;">MovieProvider</strong>
+              <small style="color: var(--text-muted);">Loading/Error State</small>
+            </div>
+            <div class="pipeline-arrow"><i data-lucide="arrow-right"></i></div>
+
+            <div class="pipeline-step">
+              <div class="pipeline-num">5</div>
+              <strong style="color: #f43f5e; display: block; margin-bottom: 4px;">UI Presentation</strong>
+              <small style="color: var(--text-muted);">Screens & API Inspector</small>
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin-top: 24px;">
+            <div class="card">
+              <h4 class="card-title">Clean Separation</h4>
+              <p class="card-desc">UI screens never call HTTP APIs directly; they only interact with Provider.</p>
+            </div>
+            <div class="card">
+              <h4 class="card-title">Null-Safe Deserialization</h4>
+              <p class="card-desc">Raw JSON maps are parsed into strongly typed models before touching state.</p>
+            </div>
+            <div class="card">
+              <h4 class="card-title">Testability</h4>
+              <p class="card-desc">Every layer is decoupled, allowing 14 automated unit tests using mock adapters.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 3: PACKAGES & DEPENDENCIES -->
+        <div class="slide" data-slide="3">
+          <div class="slide-badge badge-amber">
+            <i data-lucide="box" style="width: 14px; height: 14px;"></i>
+            pubspec.yaml Dependencies
+          </div>
+          <h2 class="slide-title">Core Packages & Why We Picked Them</h2>
+          <p class="slide-subtitle">
+            We selected reliable packages to guarantee security, performance, and responsive state:
+          </p>
+
+          <div class="grid-2">
+            <div class="grid-2" style="grid-column: span 1; gap: 16px;">
+              <div class="card">
+                <div class="card-icon icon-cyan"><i data-lucide="globe"></i></div>
+                <h4 class="card-title">dio: ^5.7.0</h4>
+                <p class="card-desc">High-performance HTTP client. Auto-merges API keys into query params, enforces 10s timeouts, and handles JSON envelopes cleanly.</p>
+                <span class="card-badge">Networking Layer</span>
+              </div>
+              <div class="card">
+                <div class="card-icon icon-purple"><i data-lucide="refresh-cw"></i></div>
+                <h4 class="card-title">provider: ^6.1.2</h4>
+                <p class="card-desc">Lightweight state management based on InheritedWidget. Provides reactive data propagation using <code>ChangeNotifier</code> and <code>Consumer</code>.</p>
+                <span class="card-badge">State Management</span>
+              </div>
+              <div class="card">
+                <div class="card-icon icon-emerald"><i data-lucide="shield-check"></i></div>
+                <h4 class="card-title">flutter_dotenv: ^5.2.1</h4>
+                <p class="card-desc">Secures TMDB API credentials by loading them from an untracked <code>.env</code> file at app launch.</p>
+                <span class="card-badge">Security & Config</span>
+              </div>
+              <div class="card">
+                <div class="card-icon icon-amber"><i data-lucide="type"></i></div>
+                <h4 class="card-title">google_fonts: ^6.2.1</h4>
+                <p class="card-desc">Provides Playfair Display (cinematic titles) and Outfit (clean UI body typography).</p>
+                <span class="card-badge">Cinematic Design</span>
+              </div>
+            </div>
+
+            <div class="code-window">
+              <div class="code-topbar">
+                <div class="code-dots"><div class="code-dot dot-red"></div><div class="code-dot dot-yellow"></div><div class="code-dot dot-green"></div></div>
+                <div class="code-filename">frontend/pubspec.yaml</div>
+              </div>
+              <pre class="code-content"><code><span class="prop">name</span>: api
+<span class="prop">description</span>: <span class="str">"MovieHub - Discover & Track Movies."</span>
+
+<span class="prop">environment</span>:
+  <span class="prop">sdk</span>: ^3.11.3
+
+<span class="prop">dependencies</span>:
+  <span class="prop">flutter</span>:
+    <span class="prop">sdk</span>: flutter
+  <span class="prop">dio</span>: ^5.7.0              <span class="cm"># HTTP Networking</span>
+  <span class="prop">provider</span>: ^6.1.2         <span class="cm"># Reactive State</span>
+  <span class="prop">flutter_dotenv</span>: ^5.2.1   <span class="cm"># TMDB_API_KEY loader</span>
+  <span class="prop">google_fonts</span>: ^6.2.1     <span class="cm"># Custom Typography</span>
+  <span class="prop">cached_network_image</span>: ^3.4.1
+
+<span class="prop">flutter</span>:
+  <span class="prop">assets</span>:
+    - .env                 <span class="cm"># API credential asset</span></code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 4: API INTEGRATION -->
+        <div class="slide" data-slide="4">
+          <div class="slide-badge badge-purple">
+            <i data-lucide="network" style="width: 14px; height: 14px;"></i>
+            Data Layer Implementation
+          </div>
+          <h2 class="slide-title">API Integration: 6 TMDB Endpoints</h2>
+          <p class="slide-subtitle">
+            Centralized inside <code>TmdbApiService</code> using BaseOptions to avoid duplicate headers:
+          </p>
+
+          <div class="grid-2">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>UI Placement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><b>1</b></td>
+                    <td><span class="tag-path">/movie/popular</span></td>
+                    <td><code>GET</code></td>
+                    <td>Home Popular Feed</td>
+                  </tr>
+                  <tr>
+                    <td><b>2</b></td>
+                    <td><span class="tag-path">/movie/top_rated</span></td>
+                    <td><code>GET</code></td>
+                    <td>Top Rated Feed Chip</td>
+                  </tr>
+                  <tr>
+                    <td><b>3</b></td>
+                    <td><span class="tag-path">/trending/movie/week</span></td>
+                    <td><code>GET</code></td>
+                    <td>Trending Feed Chip</td>
+                  </tr>
+                  <tr>
+                    <td><b>4</b></td>
+                    <td><span class="tag-path">/search/movie?query=</span></td>
+                    <td><code>GET</code></td>
+                    <td>Live Search Bar</td>
+                  </tr>
+                  <tr>
+                    <td><b>5</b></td>
+                    <td><span class="tag-path">/movie/{id}</span></td>
+                    <td><code>GET</code></td>
+                    <td>Detail Runtime & Tagline</td>
+                  </tr>
+                  <tr>
+                    <td><b>6</b></td>
+                    <td><span class="tag-path">/movie/{id}/credits</span></td>
+                    <td><code>GET</code></td>
+                    <td>Top Cast Actors Carousel</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="code-window">
+              <div class="code-topbar">
+                <div class="code-dots"><div class="code-dot dot-red"></div><div class="code-dot dot-yellow"></div><div class="code-dot dot-green"></div></div>
+                <div class="code-filename">lib/core/services/tmdb_api_service.dart</div>
+              </div>
+              <pre class="code-content"><code><span class="kw">class</span> <span class="typ">TmdbApiService</span> {
+  <span class="typ">TmdbApiService</span>({<span class="kw">required</span> <span class="kw">this</span>.apiKey, <span class="typ">Dio</span>? dio})
+      : _dio = dio ?? <span class="typ">Dio</span>(
+          <span class="typ">BaseOptions</span>(
+            baseUrl: <span class="str">'https://api.themoviedb.org/3'</span>,
+            queryParameters: {
+              <span class="str">'api_key'</span>: apiKey,
+              <span class="str">'language'</span>: <span class="str">'en-US'</span>
+            },
+            connectTimeout: <span class="kw">const</span> <span class="typ">Duration</span>(seconds: <span class="num">10</span>),
+          ),
+        );
+
+  <span class="cm">// Fetch Popular Movies</span>
+  <span class="typ">Future</span>&lt;<span class="typ">List</span>&lt;<span class="typ">Movie</span>&gt;&gt; <span class="fn">fetchPopular</span>() <span class="kw">async</span> {
+    <span class="kw">final</span> res = <span class="kw">await</span> _dio.<span class="fn">get</span>(<span class="str">'/movie/popular'</span>);
+    <span class="kw">return</span> <span class="fn">_parseResults</span>(res.data);
+  }
+}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 5: MODELS & JSON PARSING -->
+        <div class="slide" data-slide="5">
+          <div class="slide-badge badge-emerald">
+            <i data-lucide="file-json" style="width: 14px; height: 14px;"></i>
+            Type-Safe Deserialization
+          </div>
+          <h2 class="slide-title">Models & JSON Data Parsing</h2>
+          <p class="slide-subtitle">
+            Converting loose JSON into strongly-typed, immutable Dart models with null-safety defaults:
+          </p>
+
+          <div class="grid-2">
+            <div class="code-window">
+              <div class="code-topbar">
+                <div class="code-dots"><div class="code-dot dot-red"></div><div class="code-dot dot-yellow"></div><div class="code-dot dot-green"></div></div>
+                <div class="code-filename">lib/core/models/movie.dart</div>
+              </div>
+              <pre class="code-content"><code><span class="kw">factory</span> <span class="typ">Movie</span>.<span class="fn">fromJson</span>(<span class="typ">Map</span>&lt;<span class="typ">String</span>, <span class="typ">dynamic</span>&gt; json) {
+  <span class="kw">return</span> <span class="typ">Movie</span>(
+    id: json[<span class="str">'id'</span>] <span class="kw">as</span> <span class="typ">int</span>,
+    title: json[<span class="str">'title'</span>] <span class="kw">as</span> <span class="typ">String</span>? ?? <span class="str">'Untitled'</span>,
+    overview: json[<span class="str">'overview'</span>] <span class="kw">as</span> <span class="typ">String</span>? ?? <span class="str">''</span>,
+    posterPath: json[<span class="str">'poster_path'</span>] <span class="kw">as</span> <span class="typ">String</span>?,
+    voteAverage: (json[<span class="str">'vote_average'</span>] <span class="kw">as</span> <span class="typ">num</span>?)
+        ?.toDouble() ?? <span class="num">0.0</span>,
+    releaseDate: json[<span class="str">'release_date'</span>] <span class="kw">as</span> <span class="typ">String</span>? ?? <span class="str">''</span>,
+    genreIds: (json[<span class="str">'genre_ids'</span>] <span class="kw">as</span> <span class="typ">List</span>?)?.cast&lt;<span class="typ">int</span>&gt;() ?? [],
+    runtime: json[<span class="str">'runtime'</span>] <span class="kw">as</span> <span class="typ">int</span>?,
+    tagline: json[<span class="str">'tagline'</span>] <span class="kw">as</span> <span class="typ">String</span>?,
+  );
+}</code></pre>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="card highlight">
+                <h4 class="card-title">1. Defensive Null-Safety</h4>
+                <p class="card-desc">Every field uses null fallbacks (<code>?? 'Untitled'</code>, <code>?? 0.0</code>) so missing TMDB attributes will never crash the app.</p>
+              </div>
+              <div class="card">
+                <h4 class="card-title">2. Smart Computed Getters</h4>
+                <p class="card-desc">
+                  Instead of polluting UI code, the model formats its own data:<br>
+                  • <code>ratingFormatted</code>: <code>8.433</code> ➔ <b>"8.4"</b><br>
+                  • <code>releaseYear</code>: <code>"1999-10-15"</code> ➔ <b>"1999"</b><br>
+                  • <code>posterUrl</code>: Prepends TMDB image CDN prefix automatically.
+                </p>
+              </div>
+              <div class="card">
+                <h4 class="card-title">3. Round-trip Serialization</h4>
+                <p class="card-desc">Includes <code>toJson()</code> and <code>operator ==</code> for test verification and caching.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 6: STATE MANAGEMENT -->
+        <div class="slide" data-slide="6">
+          <div class="slide-badge badge-purple">
+            <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
+            Provider & ChangeNotifier
+          </div>
+          <h2 class="slide-title">State Management & Async Tri-State</h2>
+          <p class="slide-subtitle">
+            Managing reactive UI states: <code>isLoading</code>, <code>data</code>, and <code>errorMessage</code>:
+          </p>
+
+          <div class="grid-2">
+            <div class="code-window">
+              <div class="code-topbar">
+                <div class="code-dots"><div class="code-dot dot-red"></div><div class="code-dot dot-yellow"></div><div class="code-dot dot-green"></div></div>
+                <div class="code-filename">lib/presentation/providers/movie_provider.dart</div>
+              </div>
+              <pre class="code-content"><code><span class="kw">class</span> <span class="typ">MovieProvider</span> <span class="kw">extends</span> <span class="typ">ChangeNotifier</span> {
+  <span class="typ">List</span>&lt;<span class="typ">Movie</span>&gt; _movies = [];
+  <span class="typ">bool</span> _isLoading = <span class="num">false</span>;
+  <span class="typ">String</span>? _errorMessage;
+
+  <span class="typ">Future</span>&lt;<span class="typ">void</span>&gt; <span class="fn">loadCategoryMovies</span>(<span class="typ">MovieCategory</span> cat) <span class="kw">async</span> {
+    <span class="cm">// Step 1: Set Loading</span>
+    _isLoading = <span class="num">true</span>;
+    _errorMessage = <span class="kw">null</span>;
+    <span class="fn">notifyListeners</span>(); 
+
+    <span class="kw">try</span> {
+      <span class="cm">// Step 2: Fetch & Parse</span>
+      _movies = <span class="kw">await</span> _apiService.<span class="fn">fetchPopular</span>();
+    } <span class="kw">catch</span> (e) {
+      <span class="cm">// Step 3: Handle Error</span>
+      _errorMessage = <span class="str">'Failed to load: $e'</span>;
+    } <span class="kw">finally</span> {
+      _isLoading = <span class="num">false</span>;
+      <span class="fn">notifyListeners</span>(); <span class="cm">// Re-render UI</span>
+    }
+  }
+}</code></pre>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="card">
+                <div class="card-icon icon-cyan"><i data-lucide="loader"></i></div>
+                <h4 class="card-title">1. Loading State</h4>
+                <p class="card-desc">Sets <code>_isLoading = true</code> and triggers <code>notifyListeners()</code> so the UI displays <code>CircularProgressIndicator</code>.</p>
+              </div>
+              <div class="card">
+                <div class="card-icon icon-emerald"><i data-lucide="check-circle-2"></i></div>
+                <h4 class="card-title">2. Success State</h4>
+                <p class="card-desc">Populates <code>_movies</code> with parsed model objects and renders responsive movie cards.</p>
+              </div>
+              <div class="card">
+                <div class="card-icon icon-rose"><i data-lucide="alert-triangle"></i></div>
+                <h4 class="card-title">3. Error State</h4>
+                <p class="card-desc">Catches Dio network timeouts/no-internet errors and passes readable message to the UI retry widget.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 7: UI LOADING & ERROR HANDLING -->
+        <div class="slide" data-slide="7">
+          <div class="slide-badge badge-amber">
+            <i data-lucide="layout" style="width: 14px; height: 14px;"></i>
+            User Experience
+          </div>
+          <h2 class="slide-title">UI Feedback & Error Recovery</h2>
+          <p class="slide-subtitle">
+            How <code>Consumer&lt;MovieProvider&gt;</code> seamlessly reacts to async lifecycle changes:
+          </p>
+
+          <div class="grid-3">
+            <div class="card">
+              <div class="card-icon icon-cyan"><i data-lucide="refresh-cw"></i></div>
+              <h4 class="card-title">1. Loading Spinner</h4>
+              <p class="card-desc">
+                When <code>provider.isLoading</code> is true, displays centered spinner and status: <i>"Fetching movies via Dio..."</i>
+              </p>
+              <span class="card-badge">movie_list_screen.dart:181</span>
+            </div>
+
+            <div class="card highlight">
+              <div class="card-icon icon-rose"><i data-lucide="wifi-off"></i></div>
+              <h4 class="card-title">2. Error View & Retry</h4>
+              <p class="card-desc">
+                If the network fails or API key is invalid, displays friendly error icon, failure message, and an interactive <b>Try Again</b> button.
+              </p>
+              <span class="card-badge">movie_list_screen.dart:297</span>
+            </div>
+
+            <div class="card">
+              <div class="card-icon icon-emerald"><i data-lucide="arrow-down-circle"></i></div>
+              <h4 class="card-title">3. Pull-to-Refresh</h4>
+              <p class="card-desc">
+                Wrapped with <code>RefreshIndicator</code> to let users pull down on screen or tap the AppBar reload button to re-fetch live data.
+              </p>
+              <span class="card-badge">movie_list_screen.dart:207</span>
+            </div>
+          </div>
+
+          <div class="code-window" style="margin-top: 20px; height: 180px;">
+            <div class="code-topbar">
+              <div class="code-dots"><div class="code-dot dot-red"></div><div class="code-dot dot-yellow"></div><div class="code-dot dot-green"></div></div>
+              <div class="code-filename">UI Error State Handler</div>
+            </div>
+            <pre class="code-content"><code><span class="kw">if</span> (provider.errorMessage != <span class="kw">null</span> && provider.movies.isEmpty) {
+  <span class="kw">return</span> <span class="fn">_buildErrorState</span>(
+    message: provider.errorMessage!,
+    onRetry: () => provider.<span class="fn">loadCategoryMovies</span>(provider.activeCategory),
+  );
+}</code></pre>
+          </div>
+        </div>
+
+        <!-- SLIDE 8: THE API OUTPUT INSPECTOR -->
+        <div class="slide" data-slide="8">
+          <div class="slide-badge badge-cyan">
+            <i data-lucide="binary" style="width: 14px; height: 14px;"></i>
+            Defense Highlight
+          </div>
+          <h2 class="slide-title">Built-In API Output Inspector</h2>
+          <p class="slide-subtitle">
+            Our special feature on the Movie Detail Screen proving live TMDB data extraction:
+          </p>
+
+          <div class="grid-2">
+            <div>
+              <div class="inspector-card">
+                <div style="display: flex; align-items: center; gap: 8px; color: #a78bfa; margin-bottom: 12px; font-weight: bold;">
+                  <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
+                  <span>TMDB API Output Data Inspector</span>
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 12px;">
+                  Endpoints: /movie/550, /credits, /recommendations
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">ID:</span>
+                  <span class="inspector-val">550</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Title:</span>
+                  <span class="inspector-val">"Fight Club"</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Vote Average:</span>
+                  <span class="inspector-val">8.433</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Release Date:</span>
+                  <span class="inspector-val">"1999-10-15"</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Runtime:</span>
+                  <span class="inspector-val">"139 mins"</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Actors Count:</span>
+                  <span class="inspector-val">68 cast loaded</span>
+                </div>
+                <div class="inspector-row">
+                  <span class="inspector-key">Suggested Count:</span>
+                  <span class="inspector-val">21 movies loaded</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="card highlight">
+                <h4 class="card-title">1. Proves Real-Time Deserialization</h4>
+                <p class="card-desc">During defense, judges don't have to check console logs; the parsed API values are visually printed right on screen.</p>
+              </div>
+              <div class="card">
+                <h4 class="card-title">2. Multiple Endpoints on One Screen</h4>
+                <p class="card-desc">Combines movie specs, actor portraits from <code>/credits</code>, and recommended films from <code>/recommendations</code> simultaneously.</p>
+              </div>
+              <span class="tag-path" style="align-self: flex-start;">lib/presentation/screens/movie_detail_screen.dart (Lines 300-335)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 9: CODE LOCATION MAP -->
+        <div class="slide" data-slide="9">
+          <div class="slide-badge badge-purple">
+            <i data-lucide="map-pin" style="width: 14px; height: 14px;"></i>
+            Presenter's Navigation Cheat Sheet
+          </div>
+          <h2 class="slide-title">Where the Code Lives (Defense Map)</h2>
+          <p class="slide-subtitle">
+            Exact file locations and line numbers when answering professor questions:
+          </p>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Topic / Requirement</th>
+                  <th>File Location</th>
+                  <th>Exact Line Range</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>API Key & App Bootstrap</b></td>
+                  <td><span class="tag-path">lib/main.dart</span></td>
+                  <td>Lines 25 – 39</td>
+                </tr>
+                <tr>
+                  <td><b>Dio Client & 6 Endpoints</b></td>
+                  <td><span class="tag-path">lib/core/services/tmdb_api_service.dart</span></td>
+                  <td>Lines 21 – 109</td>
+                </tr>
+                <tr>
+                  <td><b>JSON Parsing & Model</b></td>
+                  <td><span class="tag-path">lib/core/models/movie.dart</span></td>
+                  <td>Lines 63 – 90</td>
+                </tr>
+                <tr>
+                  <td><b>Provider State & Actions</b></td>
+                  <td><span class="tag-path">lib/presentation/providers/movie_provider.dart</span></td>
+                  <td>Lines 85 – 108</td>
+                </tr>
+                <tr>
+                  <td><b>Loading & Error Handling UI</b></td>
+                  <td><span class="tag-path">lib/presentation/screens/movie_list_screen.dart</span></td>
+                  <td>Lines 180 – 205, 297 – 325</td>
+                </tr>
+                <tr>
+                  <td><b>API Output Inspector Card</b></td>
+                  <td><span class="tag-path">lib/presentation/screens/movie_detail_screen.dart</span></td>
+                  <td>Lines 295 – 335</td>
+                </tr>
+                <tr>
+                  <td><b>Automated Test Suite</b></td>
+                  <td><span class="tag-path">test/widget_test.dart</span></td>
+                  <td>Lines 38 – 200 (14 passing tests)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SLIDE 10: CONCLUSION & VERIFICATION -->
+        <div class="slide title-slide" data-slide="10">
+          <div class="slide-badge badge-green">
+            <i data-lucide="check-check" style="width: 14px; height: 14px;"></i>
+            All Requirements Fulfilled
+          </div>
+          <h2 class="title-hero">14 / 14 Tests Passing</h2>
+          <p class="slide-subtitle" style="text-align: center; max-width: 680px;">
+            Our test suite completely covers model serialization, mock Dio adapters, Provider actions, and widget rendering.
+          </p>
+
+          <div class="grid-3" style="max-width: 800px; margin: 0 auto 30px auto;">
+            <div class="card" style="text-align: center; align-items: center;">
+              <h3 style="font-size: 2rem; color: var(--emerald); font-weight: 800;">6</h3>
+              <p class="card-desc">TMDB Endpoints</p>
+            </div>
+            <div class="card" style="text-align: center; align-items: center;">
+              <h3 style="font-size: 2rem; color: var(--cyan); font-weight: 800;">100%</h3>
+              <p class="card-desc">Null-Safe Models</p>
+            </div>
+            <div class="card" style="text-align: center; align-items: center;">
+              <h3 style="font-size: 2rem; color: var(--accent); font-weight: 800;">14</h3>
+              <p class="card-desc">Automated Tests Passed</p>
+            </div>
+          </div>
+
+          <div style="color: var(--text-muted); font-size: 0.95rem;">
+            Ready for Live Demonstration & Questions. Thank you!
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Reporter Notes Drawer -->
+      <aside class="notes-drawer" id="notesDrawer">
+        <div class="notes-header">
+          <div class="notes-title">
+            <i data-lucide="mic"></i>
+            <span>Reporter Script & Cues</span>
+          </div>
+          <button class="btn-toggle-notes" id="closeNotesBtn" style="padding: 4px 8px;">✕</button>
+        </div>
+        <div class="notes-content" id="notesContent">
+          <!-- Dynamic Content Populated by JS -->
+        </div>
+      </aside>
+    </div>
+
+    <!-- Footer Navigation -->
+    <footer>
+      <div class="nav-hints">
+        <span>Press <span class="kbd">←</span> <span class="kbd">→</span> or <span class="kbd">Space</span> to navigate</span>
+        <span>Press <span class="kbd">N</span> for Reporter Script</span>
+        <span>Press <span class="kbd">F</span> for Fullscreen</span>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="nav-btn" id="prevBtn" title="Previous Slide">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <button class="nav-btn" id="nextBtn" title="Next Slide">
+          <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Presenter scripts per slide
+    const scripts = {
+      1: {
+        title: "Slide 1: Introduction",
+        script: "Good day everyone! Today we present MovieHub, a Flutter mobile application built for our Midterm project. The app connects to The Movie Database (TMDB) REST API to search, discover, and inspect movies using a modern, scalable architecture.",
+        cues: [
+          "State your group name and introduce members.",
+          "Highlight that the app integrates 6 distinct TMDB REST endpoints."
+        ]
+      },
+      2: {
+        title: "Slide 2: System Architecture",
+        script: "Before jumping into code, here is our 4-tier pipeline: TMDB Cloud sends raw JSON -> Dio HTTP client handles networking -> Dart Models deserialize JSON with null-safety -> Provider manages state -> and UI displays it. This clean architecture means screens never make direct HTTP calls.",
+        cues: [
+          "Point out the unidirectional data flow.",
+          "Emphasize separation of concerns."
+        ]
+      },
+      3: {
+        title: "Slide 3: Packages & Dependencies",
+        script: "In pubspec.yaml, we included Dio for networking over default http because it handles base URLs, headers, and timeouts out of the box. We used Provider for reactive state management, flutter_dotenv to protect our private API keys, and Google Fonts for our dark cinematic theme.",
+        cues: [
+          "Open pubspec.yaml if asked.",
+          "Explain why flutter_dotenv is crucial for API key security."
+        ]
+      },
+      4: {
+        title: "Slide 4: API Integration",
+        script: "All API calls are centralized in TmdbApiService. We set a 10-second timeout and auto-attach the api_key. We consume 6 endpoints: Popular, Top Rated, and Trending for category feeds, Search for live keyword queries, and Movie Details, Credits, and Recommendations on the detail screen.",
+        cues: [
+          "Highlight that BaseOptions avoids duplicate code across endpoints."
+        ]
+      },
+      5: {
+        title: "Slide 5: Models & JSON Parsing",
+        script: "APIs return loose dictionaries. If a field is missing, apps can crash. Our Movie.fromJson factory uses defensive null-safety with fallback operators like '?? Untitled' and '?? 0.0'. We also wrote computed getters like ratingFormatted and posterUrl so widgets remain clean.",
+        cues: [
+          "Explain what factory constructor does in Dart.",
+          "Point to lines 63-90 in movie.dart."
+        ]
+      },
+      6: {
+        title: "Slide 6: State Management & Provider",
+        script: "For state, we use MovieProvider extending ChangeNotifier. Each API fetch executes a strict 3-step cycle: 1) set isLoading true and notify listeners, 2) await the parsed data, and 3) catch any network errors, reset loading, and notify listeners to rebuild the UI.",
+        cues: [
+          "Mention how notifyListeners() prevents unnecessary widget rebuilds.",
+          "Explain try-catch-finally block."
+        ]
+      },
+      7: {
+        title: "Slide 7: UI Loading & Error States",
+        script: "In our MovieListScreen, we use Consumer<MovieProvider> to handle all 3 states: If loading, a spinner is shown. If an error occurs, an error banner with a 'Try Again' retry button appears. If successful, movies are rendered with pull-to-refresh support.",
+        cues: [
+          "Demonstrate error handling resilience.",
+          "Mention RefreshIndicator."
+        ]
+      },
+      8: {
+        title: "Slide 8: API Output Inspector",
+        script: "To prove our API integration during defense, we built a dedicated TMDB API Output Data card on the Detail Screen. It displays the live deserialized fields: ID, Title, Vote Average, Release Date, and Actor count, confirming real-time communication with TMDB.",
+        cues: [
+          "This is your defense highlight! Show this during live demo.",
+          "Mention that 3 endpoints combine on this single view."
+        ]
+      },
+      9: {
+        title: "Slide 9: Code Map Cheat Sheet",
+        script: "If you'd like to inspect the code, here is our file map. From main.dart for setup, to tmdb_api_service.dart for networking, movie.dart for models, and movie_provider.dart for state management.",
+        cues: [
+          "Keep this slide open during teacher Q&A."
+        ]
+      },
+      10: {
+        title: "Slide 10: Conclusion & Testing",
+        script: "To guarantee stability, we wrote 14 automated unit and widget tests covering our models, Dio mock adapters, and UI rendering. All 14 tests pass. We are now ready for the live app demo!",
+        cues: [
+          "Offer to run 'flutter test' or launch the app live."
+        ]
+      }
+    };
+
+    // State
+    let currentSlide = 1;
+    const totalSlides = 10;
+    const slides = document.querySelectorAll('.slide');
+    const counter = document.getElementById('slideCounter');
+    const progress = document.getElementById('progressBar');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const toggleNotesBtn = document.getElementById('toggleNotesBtn');
+    const closeNotesBtn = document.getElementById('closeNotesBtn');
+    const notesDrawer = document.getElementById('notesDrawer');
+    const notesContent = document.getElementById('notesContent');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    function updateSlide(index) {
+      if (index < 1 || index > totalSlides) return;
+      currentSlide = index;
+
+      slides.forEach((slide) => {
+        const sIndex = parseInt(slide.dataset.slide);
+        slide.classList.remove('active', 'prev');
+        if (sIndex === currentSlide) {
+          slide.classList.add('active');
+        } else if (sIndex < currentSlide) {
+          slide.classList.add('prev');
+        }
+      });
+
+      // Update UI elements
+      counter.textContent = `${currentSlide.toString().padStart(2, '0')} / ${totalSlides.toString().padStart(2, '0')}`;
+      progress.style.width = `${(currentSlide / totalSlides) * 100}%`;
+      prevBtn.disabled = currentSlide === 1;
+      nextBtn.disabled = currentSlide === totalSlides;
+
+      // Update speaker notes
+      const data = scripts[currentSlide];
+      if (data) {
+        notesContent.innerHTML = `
+          <h4>${data.title}</h4>
+          <div class="script-box">"${data.script}"</div>
+          <strong style="color: var(--cyan); font-size: 0.85rem; text-transform: uppercase;">Presenter Cues:</strong>
+          <ul class="cue-list">
+            ${data.cues.map(c => `<li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald);"></i> ${c}</li>`).join('')}
+          </ul>
+        `;
+        lucide.createIcons();
+      }
+    }
+
+    // Event listeners
+    prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
+    nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        updateSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        updateSlide(currentSlide - 1);
+      } else if (e.key.toLowerCase() === 'n') {
+        toggleNotes();
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    function toggleNotes() {
+      notesDrawer.classList.toggle('open');
+      toggleNotesBtn.classList.toggle('active');
+    }
+
+    toggleNotesBtn.addEventListener('click', toggleNotes);
+    closeNotesBtn.addEventListener('click', toggleNotes);
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+    // Initial render
+    updateSlide(1);
+    lucide.createIcons();
+  </script>
+</body>
+</html>
